@@ -21,7 +21,7 @@ setup(
                 sources=[
                     'funlib/evaluate/rand_voi.pyx'
                 ],
-                extra_compile_args=['-O3'],
+                extra_compile_args=['-O3', '-std=c++11'],
                 include_dirs=[np.get_include()],
                 language='c++')
         ])

@@ -34,22 +34,25 @@ class TestRandVoi(unittest.TestCase):
         assert m['voi_split'] == 1.0
         assert m['voi_merge'] == 0.0
 
-        a = np.array([1, 1, 2, 2, 2], dtype=np.uint64)
-        b = np.array([3, 3, 3, 4, 4], dtype=np.uint64)
+        a = np.array([1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4], dtype=np.uint64)
+        b = np.array([3, 3, 3, 3, 4, 5, 6, 6, 5, 5, 5], dtype=np.uint64)
 
         m = evaluate.rand_voi(a, b)
 
-        self.assertAlmostEqual(m['rand_split'], 0.6923076923076923)
-        self.assertAlmostEqual(m['rand_merge'], 0.6923076923076923)
-        self.assertAlmostEqual(m['voi_split'], 0.5509775004326936)
-        self.assertAlmostEqual(m['voi_merge'], 0.5509775004326936)
+        self.assertAlmostEqual(m['rand_split'], 0.6363636363636364)
+        self.assertAlmostEqual(m['rand_merge'], 0.5675675675675675)
+        self.assertAlmostEqual(m['voi_split'], 0.6140806820148608)
+        self.assertAlmostEqual(m['voi_merge'], 0.7272727272727271)
 
-        m = evaluate.rand_voi(b, a)
+        m = evaluate.rand_voi(b, a, return_cluster_scores=True)
 
-        self.assertAlmostEqual(m['rand_split'], 0.6923076923076923)
-        self.assertAlmostEqual(m['rand_merge'], 0.6923076923076923)
-        self.assertAlmostEqual(m['voi_split'], 0.5509775004326936)
-        self.assertAlmostEqual(m['voi_merge'], 0.5509775004326936)
+        self.assertAlmostEqual(m['rand_split'], 0.5675675675675675)
+        self.assertAlmostEqual(m['rand_merge'], 0.6363636363636364)
+        self.assertAlmostEqual(m['voi_split'], 0.7272727272727271)
+        self.assertAlmostEqual(m['voi_merge'], 0.6140806820148608)
+
+        self.assertAlmostEqual(sum(m['voi_split_i'].values()), m['voi_split'])
+        self.assertAlmostEqual(sum(m['voi_merge_j'].values()), m['voi_merge'])
 
     def test_inputs(self):
 

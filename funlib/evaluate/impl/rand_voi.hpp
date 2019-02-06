@@ -10,6 +10,9 @@ struct Metrics {
 	double voi_merge;
 	double rand_split;
 	double rand_merge;
+
+	std::map<uint64_t, double> voi_split_i;
+	std::map<uint64_t, double> voi_merge_j;
 };
 
 template <typename V1, typename V2>
@@ -17,7 +20,8 @@ Metrics
 rand_voi_arrays(
 		std::size_t size,
 		const V1* labels_a,
-		const V2* labels_b){
+		const V2* labels_b,
+		bool return_cluster_scores=false){
 
 	double total = 0;
 
@@ -72,12 +76,33 @@ rand_voi_arrays(
 
 	// compute entropies
 
+	std::map<uint64_t, double> voi_split_i;
+	std::map<uint64_t, double> voi_merge_j;
+
+	if (return_cluster_scores) {
+
+		for ( auto& a: p_i )
+			voi_split_i[a.first] = a.second * log2(a.second);
+		for ( auto& b: p_j )
+			voi_merge_j[b.first] = b.second * log2(b.second);
+	}
+
 	// H(a,b)
 	double H_ab = 0;
 	for ( auto& a: p_ij )
-		for ( auto& b: a.second )
-			if(b.second)
+		for ( auto& b: a.second ) {
+
+			if(b.second) {
+
 				H_ab -= b.second * log2(b.second);
+
+				if (return_cluster_scores) {
+
+					voi_split_i[a.first] -= b.second * log2(b.second);
+					voi_merge_j[b.first] -= b.second * log2(b.second);
+				}
+			}
+		}
 
 	// H(a)
 	double H_a = 0;
@@ -104,6 +129,8 @@ rand_voi_arrays(
 	metrics.rand_merge = rand_merge;
 	metrics.voi_split  = voi_split;
 	metrics.voi_merge  = voi_merge;
+	metrics.voi_split_i = voi_split_i;
+	metrics.voi_merge_j = voi_merge_j;
 
 	return metrics;
 }

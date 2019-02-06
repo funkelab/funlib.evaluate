@@ -1,8 +1,10 @@
 from libc.stdint cimport uint64_t
+from libcpp cimport bool
+from libcpp.map cimport map as cpp_map
 import numpy as np
 cimport numpy as np
 
-def rand_voi(truth, test):
+def rand_voi(truth, test, return_cluster_scores=False):
 
     for d in range(truth.ndim):
         assert truth.shape[d] == test.shape[d], (
@@ -10,11 +12,13 @@ def rand_voi(truth, test):
 
     return rand_voi_wrapper(
         np.ravel(truth, order='A'),
-        np.ravel(test, order='A'))
+        np.ravel(test, order='A'),
+        return_cluster_scores)
 
 def rand_voi_wrapper(
         np.ndarray[uint64_t] truth,
-        np.ndarray[uint64_t] test):
+        np.ndarray[uint64_t] test,
+        return_cluster_scores):
 
     # the C++ part assumes contiguous memory, make sure we have it (and do 
     # nothing, if we do)
@@ -34,17 +38,21 @@ def rand_voi_wrapper(
     return rand_voi_arrays(
         test.size,
         truth_data,
-        test_data)
+        test_data,
+        return_cluster_scores)
 
 cdef extern from "impl/rand_voi.hpp":
 
     struct Metrics:
-        double voi_split
-        double voi_merge
         double rand_split
         double rand_merge
+        double voi_split
+        double voi_merge
+        cpp_map[uint64_t, double] voi_split_i
+        cpp_map[uint64_t, double] voi_merge_j
 
     Metrics rand_voi_arrays(
             size_t          size,
             const uint64_t* truth_data,
-            const uint64_t* test_data);
+            const uint64_t* test_data,
+            bool            return_cluster_scores);

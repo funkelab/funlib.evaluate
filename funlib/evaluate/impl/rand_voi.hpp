@@ -16,8 +16,8 @@ template <typename V1, typename V2>
 Metrics
 rand_voi_arrays(
 		std::size_t size,
-		const V1* gt,
-		const V2* ws){
+		const V1* labels_a,
+		const V2* labels_b){
 
 	double total = 0;
 
@@ -25,20 +25,20 @@ rand_voi_arrays(
 	std::map<uint64_t, std::map<uint64_t, double>> p_ij;
 
 	// number of occurences of label i and j in the respective volumes
-	std::map<uint64_t, double> s_i, t_j;
+	std::map<uint64_t, double> p_i, p_j;
 
 	for (std::ptrdiff_t i = 0; i < size; ++i) {
 
-		uint64_t wsv = ws[i];
-		uint64_t gtv = gt[i];
+		uint64_t a = labels_a[i];
+		uint64_t b = labels_b[i];
 
-		if (gtv) {
+		if (a) {
 
 			++total;
 
-			++p_ij[gtv][wsv];
-			++s_i[wsv];
-			++t_j[gtv];
+			++p_ij[a][b];
+			++p_i[a];
+			++p_j[b];
 		}
 	}
 
@@ -48,15 +48,15 @@ rand_voi_arrays(
 		for ( auto& b: a.second )
 			sum_p_ij += b.second * b.second;
 
-	// sum of squares in t_j
-	double sum_t_k = 0;
-	for ( auto& a: t_j )
-		sum_t_k += a.second * a.second;
+	// sum of squares in p_i
+	double sum_p_i = 0;
+	for ( auto& a: p_i )
+		sum_p_i += a.second * a.second;
 
-	// sum of squares in s_i
-	double sum_s_k = 0;
-	for ( auto& a: s_i )
-		sum_s_k += a.second * a.second;
+	// sum of squares in p_j
+	double sum_p_j = 0;
+	for ( auto& b: p_j )
+		sum_p_j += b.second * b.second;
 
 	// we have everything we need for RAND, normalize histograms for VOI
 
@@ -64,40 +64,40 @@ rand_voi_arrays(
 		for ( auto& b: a.second )
 			b.second /= total;
 
-	for ( auto& a: t_j )
+	for ( auto& a: p_i )
 		a.second /= total;
 
-	for ( auto& a: s_i )
-		a.second /= total;
+	for ( auto& b: p_j )
+		b.second /= total;
 
 	// compute entropies
 
-	// H(s,t)
-	double H_st = 0;
+	// H(a,b)
+	double H_ab = 0;
 	for ( auto& a: p_ij )
 		for ( auto& b: a.second )
 			if(b.second)
-				H_st -= b.second * log2(b.second);
+				H_ab -= b.second * log2(b.second);
 
-	// H(t)
-	double H_t = 0;
-	for ( auto& a: t_j )
+	// H(a)
+	double H_a = 0;
+	for ( auto& a: p_i )
 		if(a.second)
-			H_t -= a.second * log2(a.second);
+			H_a -= a.second * log2(a.second);
 
-	// H(s)
-	double H_s = 0;
-	for ( auto& a: s_i )
-		if(a.second)
-			H_s -= a.second * log2(a.second);
+	// H(b)
+	double H_b = 0;
+	for ( auto& b: p_j )
+		if(b.second)
+			H_b -= b.second * log2(b.second);
 
-	double rand_split = sum_p_ij/sum_t_k;
-	double rand_merge = sum_p_ij/sum_s_k;
+	double rand_split = sum_p_ij/sum_p_i;
+	double rand_merge = sum_p_ij/sum_p_j;
 
-	// H(s|t)
-	double voi_split = H_st - H_t;
-	// H(t|s)
-	double voi_merge = H_st - H_s;
+	// H(b|a)
+	double voi_split = H_ab - H_a;
+	// H(a|b)
+	double voi_merge = H_ab - H_b;
 
 	Metrics metrics;
 	metrics.rand_split = rand_split;

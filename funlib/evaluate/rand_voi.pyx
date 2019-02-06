@@ -2,39 +2,39 @@ from libc.stdint cimport uint64_t
 import numpy as np
 cimport numpy as np
 
-def rand_voi(segmentation, gt):
+def rand_voi(truth, test):
 
-    for d in range(segmentation.ndim):
-        assert segmentation.shape[d] == gt.shape[d], (
-                "shapes between segmentation and gt don't match")
+    for d in range(truth.ndim):
+        assert truth.shape[d] == test.shape[d], (
+                "shapes between truth and test don't match")
 
     return rand_voi_wrapper(
-        np.ravel(segmentation, order='A'),
-        np.ravel(gt, order='A'))
+        np.ravel(truth, order='A'),
+        np.ravel(test, order='A'))
 
 def rand_voi_wrapper(
-        np.ndarray[uint64_t] segmentation,
-        np.ndarray[uint64_t] gt):
+        np.ndarray[uint64_t] truth,
+        np.ndarray[uint64_t] test):
 
     # the C++ part assumes contiguous memory, make sure we have it (and do 
     # nothing, if we do)
-    if not segmentation.flags['C_CONTIGUOUS']:
-        print("Creating memory-contiguous segmentation arrray (avoid this by passing C_CONTIGUOUS arrays)")
-        segmentation = np.ascontiguousarray(segmentation)
-    if gt is not None and not gt.flags['C_CONTIGUOUS']:
+    if truth is not None and not truth.flags['C_CONTIGUOUS']:
         print("Creating memory-contiguous ground-truth arrray (avoid this by passing C_CONTIGUOUS arrays)")
-        gt = np.ascontiguousarray(gt)
+        truth = np.ascontiguousarray(truth)
+    if not test.flags['C_CONTIGUOUS']:
+        print("Creating memory-contiguous test arrray (avoid this by passing C_CONTIGUOUS arrays)")
+        test = np.ascontiguousarray(test)
 
-    cdef uint64_t* segmentation_data
-    cdef uint64_t* gt_data
+    cdef uint64_t* test_data
+    cdef uint64_t* truth_data
 
-    segmentation_data = <uint64_t*>segmentation.data
-    gt_data = <uint64_t*>gt.data
+    test_data = <uint64_t*>test.data
+    truth_data = <uint64_t*>truth.data
 
     return rand_voi_arrays(
-        segmentation.size,
-        gt_data,
-        segmentation_data)
+        test.size,
+        truth_data,
+        test_data)
 
 cdef extern from "impl/rand_voi.hpp":
 
@@ -46,5 +46,5 @@ cdef extern from "impl/rand_voi.hpp":
 
     Metrics rand_voi_arrays(
             size_t          size,
-            const uint64_t* gt_data,
-            const uint64_t* segmentation_data);
+            const uint64_t* truth_data,
+            const uint64_t* test_data);

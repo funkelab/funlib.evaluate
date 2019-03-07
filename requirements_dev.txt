@@ -3,3 +3,4 @@ flake8
 numpy
 pytest
 pytest-cov
+networkx

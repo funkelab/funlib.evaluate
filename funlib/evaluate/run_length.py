@@ -1,0 +1,227 @@
+import numpy as np
+
+
+def expected_run_length(
+        skeletons,
+        skeleton_id_attribute,
+        edge_length_attribute,
+        node_segment_lut,
+        skeleton_lengths=None,
+        skeleton_position_attributes=None):
+    '''Compute the expected run-length on skeletons, given a segmentation in
+    the form of a node -> segment lookup table.
+
+    Args:
+
+        skeletons:
+
+            A networkx-like graph.
+
+        skeleton_id_attribute:
+
+            The name of the node attribute containing the skeleton ID.
+
+        edge_length_attribute:
+
+            The name of the edge attribute for the length of an edge. If
+            `skeleton_position_attributes` is given, the lengthes will be
+            computed from the node positions and stored in this attribute. If
+            `skeleton_position_attributes` is not given, it is assumed that the
+            lengths are already stored in `edge_length_attribute`.
+
+            The latter use case allows to precompute the the edge lengths using
+            function `get_skeleton_lengths` below, and reuse them for
+            subsequent calls with different `node_segment_lut`s.
+
+        node_segment_lut:
+
+            A dictionary mapping node IDs to segment IDs.
+
+        skeleton_lengths (optional):
+
+            A dictionary from skeleton IDs to their length. Has to be given if
+            precomputed edge lengths are to be used (see argument
+            `edge_length_attribute`).
+
+        skeleton_position_attributes (optional):
+
+            A list of strings with the names of the node attributes for the
+            spatial coordinates.
+    '''
+
+    if skeleton_position_attributes is not None:
+
+        if skeleton_lengths is not None:
+            raise ValueError(
+                "If skeleton_position_attributes is given, skeleton_lengths"
+                "should not be given")
+
+        skeleton_lengths = get_skeleton_lengths(
+            skeletons,
+            skeleton_position_attributes,
+            skeleton_id_attribute,
+            store_edge_length=edge_length_attribute)
+
+    total_skeletons_length = np.sum([l for _, l in skeleton_lengths.items()])
+
+    skeleton_scores = evaluate_skeletons(
+        skeletons,
+        skeleton_id_attribute,
+        node_segment_lut)
+
+    skeletons_erl = 0
+
+    for skeleton_id, scores in skeleton_scores.items():
+
+        skeleton_length = skeleton_lengths[skeleton_id]
+        skeleton_erl = 0
+
+        for segment_id, correct_edges in scores.correct_edges.items():
+
+            correct_edges_length = np.sum([
+                skeletons.edges[e][edge_length_attribute]
+                for e in correct_edges])
+
+            skeleton_erl += (
+                correct_edges_length *
+                (correct_edges_length/skeleton_length)
+            )
+
+        skeletons_erl += (
+            (skeleton_length/total_skeletons_length) *
+            skeleton_erl
+        )
+
+    return skeletons_erl
+
+
+def get_skeleton_lengths(
+        skeletons,
+        skeleton_position_attributes,
+        skeleton_id_attribute,
+        store_edge_length=None):
+    '''Get the length of each skeleton in the given graph.
+
+    Args:
+
+        skeletons:
+
+            A networkx-like graph.
+
+        skeleton_position_attributes:
+
+            A list of strings with the names of the node attributes for the
+            spatial coordinates.
+
+        skeleton_id_attribute:
+
+            The name of the node attribute containing the skeleton ID.
+
+        store_edge_length (optional):
+
+            If given, stores the length of an edge in this edge attribute.
+    '''
+
+    node_positions = {
+        node: np.array(
+            [
+                skeletons.nodes[node][d]
+                for d in skeleton_position_attributes
+            ],
+            dtype=np.float32)
+        for node in skeletons.nodes()
+    }
+
+    skeleton_lengths = {}
+    for u, v, data in skeletons.edges(data=True):
+
+        skeleton_id = skeletons.nodes[u][skeleton_id_attribute]
+
+        if skeleton_id not in skeleton_lengths:
+            skeleton_lengths[skeleton_id] = 0
+
+        pos_u = node_positions[u]
+        pos_v = node_positions[v]
+
+        length = np.linalg.norm(pos_u - pos_v)
+
+        if store_edge_length:
+            data[store_edge_length] = length
+        skeleton_lengths[skeleton_id] += length
+
+    return skeleton_lengths
+
+
+class SkeletonScores():
+
+    def __init__(self):
+
+        self.ommitted = 0
+        self.split = 0
+        self.merged = 0
+        self.correct = 0
+        self.correct_edges = {}
+
+
+def evaluate_skeletons(
+        skeletons,
+        skeleton_id_attribute,
+        node_segment_lut):
+
+    # find all merged skeletons (all their edges will be counted as merged)
+
+    # pairs of (skeleton, segment), one for each node
+    skeleton_segment = np.array([
+        [data[skeleton_id_attribute], node_segment_lut[n]]
+        for n, data in skeletons.nodes(data=True)
+    ])
+
+    # unique pairs of (skeleton, segment)
+    skeleton_segment = np.unique(skeleton_segment, axis=0)
+
+    # number of times that a segment was mapped to a skeleton
+    segments, num_segment_skeletons = np.unique(
+        skeleton_segment[:, 1],
+        return_counts=True)
+
+    # all segments that merge at least two skeletons
+    merging_segments = segments[num_segment_skeletons > 1]
+
+    merging_segments_mask = np.isin(skeleton_segment[:, 1], merging_segments)
+    merged_skeletons = skeleton_segment[:, 0][merging_segments_mask]
+    merged_skeletons = set(np.unique(merged_skeletons))
+
+    skeleton_scores = {}
+
+    for u, v in skeletons.edges():
+
+        skeleton_id = skeletons.nodes[u][skeleton_id_attribute]
+
+        if skeleton_id not in skeleton_scores:
+            scores = SkeletonScores()
+            skeleton_scores[skeleton_id] = scores
+        else:
+            scores = skeleton_scores[skeleton_id]
+
+        if skeleton_id in merged_skeletons:
+            scores.merged += 1
+            continue
+
+        segment_u = node_segment_lut[u]
+        segment_v = node_segment_lut[v]
+
+        if segment_u == 0 or segment_v == 0:
+            scores.ommitted += 1
+            continue
+
+        if segment_u != segment_v:
+            scores.split += 1
+            continue
+
+        scores.correct += 1
+
+        if segment_u not in scores.correct_edges:
+            scores.correct_edges[segment_u] = []
+        scores.correct_edges[segment_u].append((u, v))
+
+    return skeleton_scores

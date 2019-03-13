@@ -7,7 +7,8 @@ def expected_run_length(
         edge_length_attribute,
         node_segment_lut,
         skeleton_lengths=None,
-        skeleton_position_attributes=None):
+        skeleton_position_attributes=None,
+        return_merge_split_stats=False):
     '''Compute the expected run-length on skeletons, given a segmentation in
     the form of a node -> segment lookup table.
 
@@ -47,6 +48,17 @@ def expected_run_length(
 
             A list of strings with the names of the node attributes for the
             spatial coordinates.
+
+        return_merge_split_stats (optional):
+
+            If ``True``, return a dictionary with additional split/merge stats
+            together with the run length, i.e., ``(run_length, stats)``.
+
+            The merge stats are a dictionary mapping segment IDs to a list of
+            skeleton IDs that got merged.
+
+            The split stats are a dictionary mapping skeleton IDs to pairs of
+            segment IDs, one pair for each split along the skeleton edges.
     '''
 
     if skeleton_position_attributes is not None:
@@ -64,10 +76,16 @@ def expected_run_length(
 
     total_skeletons_length = np.sum([l for _, l in skeleton_lengths.items()])
 
-    skeleton_scores = evaluate_skeletons(
+    res = evaluate_skeletons(
         skeletons,
         skeleton_id_attribute,
-        node_segment_lut)
+        node_segment_lut,
+        return_merge_split_stats=return_merge_split_stats)
+
+    if return_merge_split_stats:
+        skeleton_scores, merge_split_stats = res
+    else:
+        skeleton_scores = res
 
     skeletons_erl = 0
 
@@ -92,7 +110,10 @@ def expected_run_length(
             skeleton_erl
         )
 
-    return skeletons_erl
+    if return_merge_split_stats:
+        return skeleton_erl, merge_split_stats
+    else:
+        return skeletons_erl
 
 
 def get_skeleton_lengths(
@@ -166,7 +187,8 @@ class SkeletonScores():
 def evaluate_skeletons(
         skeletons,
         skeleton_id_attribute,
-        node_segment_lut):
+        node_segment_lut,
+        return_merge_split_stats=False):
 
     # find all merged skeletons (all their edges will be counted as merged)
 
@@ -189,6 +211,19 @@ def evaluate_skeletons(
 
     merging_segments_mask = np.isin(skeleton_segment[:, 1], merging_segments)
     merged_skeletons = skeleton_segment[:, 0][merging_segments_mask]
+
+    merges = {}
+    splits = {}
+
+    if return_merge_split_stats:
+
+        merged_segments = skeleton_segment[:, 1][merging_segments_mask]
+
+        for segment, skeleton in zip(merged_segments, merged_skeletons):
+            if segment not in merges:
+                merges[segment] = []
+            merges[segment].append(skeleton)
+
     merged_skeletons = set(np.unique(merged_skeletons))
 
     skeleton_scores = {}
@@ -216,6 +251,11 @@ def evaluate_skeletons(
 
         if segment_u != segment_v:
             scores.split += 1
+
+            if return_merge_split_stats:
+                if skeleton_id not in splits:
+                    splits[skeleton_id] = []
+                splits[skeleton_id].append((segment_u, segment_v))
             continue
 
         scores.correct += 1
@@ -224,4 +264,15 @@ def evaluate_skeletons(
             scores.correct_edges[segment_u] = []
         scores.correct_edges[segment_u].append((u, v))
 
-    return skeleton_scores
+    if return_merge_split_stats:
+
+        merge_split_stats = {
+            'merge_stats': merges,
+            'split_stats': splits
+        }
+
+        return skeleton_scores, merge_split_stats
+
+    else:
+
+        return skeleton_scores

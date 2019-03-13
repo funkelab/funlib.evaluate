@@ -313,3 +313,104 @@ class TestRandVoi(unittest.TestCase):
             self.assertAlmostEqual(data['length'], math.sqrt(2), places=5)
 
         self.assertAlmostEqual(erl, 0.5*math.sqrt(2), places=5)
+
+    def test_merge_split_stats(self):
+
+        skeletons = networkx.Graph()
+
+        # one skeleton, 2*sqrt(2), no errors
+
+        skeletons.add_node(1, skeleton_id=1, z=0, y=0, x=0)
+        skeletons.add_node(2, skeleton_id=1, z=1, y=1, x=0)
+        skeletons.add_node(3, skeleton_id=1, z=0, y=1, x=1)
+        skeletons.add_edge(1, 2)
+        skeletons.add_edge(2, 3)
+        node_segment_lut = {
+            1: 10,
+            2: 10,
+            3: 10,
+        }
+
+        _, stats = evaluate.expected_run_length(
+            skeletons,
+            'skeleton_id',
+            'length',
+            node_segment_lut,
+            skeleton_position_attributes=['z', 'y', 'x'],
+            return_merge_split_stats=True)
+
+        self.assertEqual(len(stats['merge_stats']), 0)
+        self.assertEqual(len(stats['split_stats']), 0)
+
+        # ...same, one split error
+
+        node_segment_lut = {
+            1: 10,
+            2: 10,
+            3: 20,
+        }
+
+        _, stats = evaluate.expected_run_length(
+            skeletons,
+            'skeleton_id',
+            'length',
+            node_segment_lut,
+            skeleton_position_attributes=['z', 'y', 'x'],
+            return_merge_split_stats=True)
+
+        self.assertEqual(len(stats['merge_stats']), 0)
+        self.assertEqual(len(stats['split_stats']), 1)
+        self.assertEqual(stats['split_stats'][1], [(10, 20)])
+
+        # one split in 1, one in 2
+
+        skeletons = networkx.Graph()
+        skeletons.add_node(1, skeleton_id=1, z=0, y=0, x=0)
+        skeletons.add_node(2, skeleton_id=1, z=1, y=1, x=0)
+        skeletons.add_node(3, skeleton_id=1, z=0, y=1, x=1)
+        skeletons.add_edge(1, 2)
+        skeletons.add_edge(2, 3)
+        skeletons.add_node(4, skeleton_id=2, z=1, y=1, x=1)
+        skeletons.add_node(5, skeleton_id=2, z=0, y=0, x=1)
+        skeletons.add_edge(4, 5)
+        node_segment_lut = {
+            1: 10,
+            2: 10,
+            3: 30,
+            4: 20,
+            5: 40
+        }
+
+        _, stats = evaluate.expected_run_length(
+            skeletons,
+            'skeleton_id',
+            'length',
+            node_segment_lut,
+            skeleton_position_attributes=['z', 'y', 'x'],
+            return_merge_split_stats=True)
+
+        self.assertEqual(len(stats['merge_stats']), 0)
+        self.assertEqual(len(stats['split_stats']), 2)
+        self.assertEqual(stats['split_stats'][1], [(10, 30)])
+        self.assertEqual(stats['split_stats'][2], [(20, 40)])
+
+        # complete merge
+        node_segment_lut = {
+            1: 10,
+            2: 10,
+            3: 10,
+            4: 10,
+            5: 10
+        }
+
+        _, stats = evaluate.expected_run_length(
+            skeletons,
+            'skeleton_id',
+            'length',
+            node_segment_lut,
+            skeleton_position_attributes=['z', 'y', 'x'],
+            return_merge_split_stats=True)
+
+        self.assertEqual(len(stats['merge_stats']), 1)
+        self.assertEqual(len(stats['split_stats']), 0)
+        self.assertEqual(stats['merge_stats'][10], [1, 2])

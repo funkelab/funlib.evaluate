@@ -111,7 +111,7 @@ def expected_run_length(
         )
 
     if return_merge_split_stats:
-        return skeleton_erl, merge_split_stats
+        return skeletons_erl, merge_split_stats
     else:
         return skeletons_erl
 

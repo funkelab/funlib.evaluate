@@ -15,6 +15,7 @@ before_install:
   - conda info -a
   - conda create -q -n funlib python=$TRAVIS_PYTHON_VERSION
   - source activate funlib
+  - conda install -c conda-forge -c ostrokach-forge -c pkgw-forge graph-tool
 
 install:
   - make install-dev

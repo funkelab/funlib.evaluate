@@ -1,5 +1,6 @@
 from scipy.spatial import KDTree
-import networkx
+import graph_tool
+import graph_tool.flow
 import numpy as np
 
 
@@ -46,47 +47,82 @@ def split_graph(
         The number of splits performed.
     '''
 
+    # number nodes consecutively in graph
+    for i, (_, data) in enumerate(graph.nodes(data=True)):
+        data['_gt_id'] = i
+
+    # map components to positions
     component_node_positions = {
-        n: np.array([
+        graph.nodes[n]['_gt_id']: np.array([
             graph.nodes[n][p] for p in position_attributes
         ])
         for component in components
         for n in component
     }
 
-    return rec_split_graph(
-        graph,
+    # replace component node IDs with gt graph IDs
+    components = [
+        [graph.nodes[n]['_gt_id'] for n in component]
+        for component in components
+    ]
+
+    # create edge list
+    edges = np.array([
+        [graph.nodes[u]['_gt_id'], graph.nodes[v]['_gt_id']]
+        for u, v in graph.edges()])
+
+    # create weights list
+    weights = np.array(
+        [d[weight_attribute] for _, _, d in graph.edges(data=True)],
+        dtype=np.float32)
+
+    # create graph_tool graph
+    gt_graph = graph_tool.Graph()
+    gt_graph.add_edge_list(edges)
+    gt_graph.add_edge_list(edges[:, [1, 0]])  # edges are directed
+    weights = gt_graph.new_edge_property(
+        'double',
+        np.concatenate([weights, weights]))
+    split_labels = gt_graph.new_vertex_property('int64_t', val=-1)
+
+    # recursively split the graph
+    num_splits = rec_split_graph(
+        gt_graph,
+        weights,
         components,
         component_node_positions,
-        weight_attribute,
-        split_attribute,
+        split_labels,
         0)[0]
+
+    for i, (_, data) in enumerate(graph.nodes(data=True)):
+        data[split_attribute] = split_labels[i]
+
+    return num_splits
 
 
 def rec_split_graph(
         graph,
+        weights,
         components,
         component_node_positions,
-        weight_attribute,
-        split_attribute,
+        split_labels,
         next_split_id):
 
     # nothing to split?
     if len(components) <= 1:
-        for node, data in graph.nodes(data=True):
-            data[split_attribute] = next_split_id
+        for node in graph.vertices():
+            split_labels[node] = next_split_id
         return 0, next_split_id + 1
 
     # find split nodes
     component_u, component_v = select_split_component(components)
     u, v = select_split_nodes(
-        graph,
         component_u,
         component_v,
         component_node_positions)
 
     # split graph into split_u and split_v
-    split_u, split_v = min_cut(graph, u, v, weight_attribute)
+    split_u, split_v = min_cut(graph, u, v, weights)
 
     component_nodes_u = filter_component_nodes(split_u, components)
     component_nodes_v = filter_component_nodes(split_v, components)
@@ -94,24 +130,18 @@ def rec_split_graph(
     # split recursively
     num_splits_needed_u, next_split_id = rec_split_graph(
         split_u,
+        weights,
         component_nodes_u,
         component_node_positions,
-        weight_attribute,
-        split_attribute,
+        split_labels,
         next_split_id)
     num_splits_needed_v, next_split_id = rec_split_graph(
         split_v,
+        weights,
         component_nodes_v,
         component_node_positions,
-        weight_attribute,
-        split_attribute,
+        split_labels,
         next_split_id)
-
-    # copy split labels
-    for node, data in split_u.nodes(data=True):
-        graph.nodes[node][split_attribute] = data[split_attribute]
-    for node, data in split_v.nodes(data=True):
-        graph.nodes[node][split_attribute] = data[split_attribute]
 
     return 1 + num_splits_needed_u + num_splits_needed_v, next_split_id
 
@@ -124,7 +154,6 @@ def select_split_component(components):
 
 
 def select_split_nodes(
-        graph,
         component_u,
         component_v,
         component_node_positions):
@@ -143,19 +172,21 @@ def select_split_nodes(
     return component_u[u_index], component_v[v_index]
 
 
-def min_cut(graph, u, v, weight_attribute):
+def min_cut(graph, u, v, weights):
 
-    value, partition = networkx.minimum_cut(
+    res = graph_tool.flow.boykov_kolmogorov_max_flow(
+        graph,
+        graph.vertex(u), graph.vertex(v),
+        weights)
+
+    partition = graph_tool.flow.min_st_cut(
         graph,
         u,
-        v,
-        capacity=weight_attribute)
+        weights,
+        res)
 
-    split_u = graph.copy()
-    split_v = graph.copy()
-
-    split_u.remove_nodes_from(partition[1])
-    split_v.remove_nodes_from(partition[0])
+    split_u = graph_tool.GraphView(graph, vfilt=partition)
+    split_v = graph_tool.GraphView(graph, vfilt=np.logical_not(partition.a))
 
     return split_u, split_v
 
@@ -168,7 +199,7 @@ def filter_component_nodes(graph, components):
         [
             n
             for n in comp
-            if n in graph
+            if n in graph.vertices()
         ]
         for comp in components
     ]

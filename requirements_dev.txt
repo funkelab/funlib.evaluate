@@ -1,7 +1,7 @@
 cython
 flake8
+networkx
 numpy
-scipy
 pytest
 pytest-cov
-networkx
+scipy

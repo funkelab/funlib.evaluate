@@ -1,7 +1,8 @@
-from scipy.spatial import KDTree
+from scipy.spatial import cKDTree as KDTree
 import graph_tool
 import graph_tool.flow
 import numpy as np
+import time
 
 
 def split_graph(
@@ -121,35 +122,53 @@ def rec_split_graph(
         component_v,
         component_node_positions)
 
-    # split graph into split_u and split_v
-    split_u, split_v = min_cut(graph, u, v, weights)
-
-    component_nodes_u = filter_component_nodes(split_u, components)
-    component_nodes_v = filter_component_nodes(split_v, components)
+    # split graph
+    partition = min_cut(graph, u, v, weights)
 
     # split recursively
+
+    prev_partition = graph.get_vertex_filter()[0]
+
+    graph.set_vertex_filter(partition)
+    component_nodes_u = filter_component_nodes(graph, components)
     num_splits_needed_u, next_split_id = rec_split_graph(
-        split_u,
+        graph,
         weights,
         component_nodes_u,
         component_node_positions,
         split_labels,
         next_split_id)
+
+    if prev_partition:
+        partition.a = np.logical_and(
+            np.logical_not(partition.a),
+            prev_partition.a)
+    else:
+        partition.a = np.logical_not(partition.a)
+
+    graph.set_vertex_filter(partition)
+    component_nodes_v = filter_component_nodes(graph, components)
     num_splits_needed_v, next_split_id = rec_split_graph(
-        split_v,
+        graph,
         weights,
         component_nodes_v,
         component_node_positions,
         split_labels,
         next_split_id)
 
+    graph.clear_filters()
+
     return 1 + num_splits_needed_u + num_splits_needed_v, next_split_id
 
 
 def select_split_component(components):
 
+    start = time.time()
+
     # return largest two components
     components = sorted(components, key=lambda l: len(l))
+
+    print("Found split components in %.3fs" % (time.time() - start))
     return components[-2:]
 
 
@@ -158,6 +177,8 @@ def select_split_nodes(
         component_v,
         component_node_positions):
     '''Find the two spatially closest component nodes.'''
+
+    start = time.time()
 
     kd_tree_u = KDTree(
         [component_node_positions[n] for n in component_u]
@@ -169,10 +190,13 @@ def select_split_nodes(
     v_index = np.argmin(distances)
     u_index = indices[v_index]
 
+    print("Found split nodes in %.3fs" % (time.time() - start))
     return component_u[u_index], component_v[v_index]
 
 
 def min_cut(graph, u, v, weights):
+
+    start = time.time()
 
     res = graph_tool.flow.boykov_kolmogorov_max_flow(
         graph,
@@ -185,21 +209,25 @@ def min_cut(graph, u, v, weights):
         weights,
         res)
 
-    split_u = graph_tool.GraphView(graph, vfilt=partition)
-    split_v = graph_tool.GraphView(graph, vfilt=np.logical_not(partition.a))
-
-    return split_u, split_v
+    print("Split in %.3fs" % (time.time() - start))
+    return partition
 
 
 def filter_component_nodes(graph, components):
     '''Return a list of component nodes limited to nodes in graph.'''
+
+    start = time.time()
+
+    vertex_filter, inverted = graph.get_vertex_filter()
+    vertex_filter_array = vertex_filter.a
+    contained = not inverted
 
     # filter nodes
     components = [
         [
             n
             for n in comp
-            if n in graph.vertices()
+            if vertex_filter_array[n] == contained
         ]
         for comp in components
     ]
@@ -207,4 +235,5 @@ def filter_component_nodes(graph, components):
     # remove empty lists
     components = [c for c in components if len(c) > 0]
 
+    print("Filtered components in %.3fs" % (time.time() - start))
     return components

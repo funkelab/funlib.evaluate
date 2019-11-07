@@ -190,7 +190,8 @@ def evaluate_skeletons(
         node_segment_lut,
         return_merge_split_stats=False):
 
-    # find all merged skeletons (all their edges will be counted as merged)
+    # find all merging segments (skeleton edges on merging segments will be
+    # counted as wrong)
 
     # pairs of (skeleton, segment), one for each node
     skeleton_segment = np.array([
@@ -211,6 +212,7 @@ def evaluate_skeletons(
 
     merging_segments_mask = np.isin(skeleton_segment[:, 1], merging_segments)
     merged_skeletons = skeleton_segment[:, 0][merging_segments_mask]
+    merging_segments = set(merging_segments)
 
     merges = {}
     splits = {}
@@ -231,19 +233,14 @@ def evaluate_skeletons(
     for u, v in skeletons.edges():
 
         skeleton_id = skeletons.nodes[u][skeleton_id_attribute]
+        segment_u = node_segment_lut[u]
+        segment_v = node_segment_lut[v]
 
         if skeleton_id not in skeleton_scores:
             scores = SkeletonScores()
             skeleton_scores[skeleton_id] = scores
         else:
             scores = skeleton_scores[skeleton_id]
-
-        if skeleton_id in merged_skeletons:
-            scores.merged += 1
-            continue
-
-        segment_u = node_segment_lut[u]
-        segment_v = node_segment_lut[v]
 
         if segment_u == 0 or segment_v == 0:
             scores.ommitted += 1
@@ -258,11 +255,20 @@ def evaluate_skeletons(
                 splits[skeleton_id].append((segment_u, segment_v))
             continue
 
+        # segment_u == segment_v != 0
+        segment = segment_u
+
+        # potentially merged edge?
+        if skeleton_id in merged_skeletons:
+            if segment in merging_segments:
+                scores.merged += 1
+                continue
+
         scores.correct += 1
 
-        if segment_u not in scores.correct_edges:
-            scores.correct_edges[segment_u] = []
-        scores.correct_edges[segment_u].append((u, v))
+        if segment not in scores.correct_edges:
+            scores.correct_edges[segment] = []
+        scores.correct_edges[segment].append((u, v))
 
     if return_merge_split_stats:
 

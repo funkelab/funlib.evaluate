@@ -6,6 +6,9 @@ import unittest
 
 class TestRandVoi(unittest.TestCase):
 
+    @unittest.skipIf(
+        not evaluate._have_graph_tool,
+        "Skipping (graph_tool not installed)")
     def test_split_graph(self):
 
         # simple case

@@ -4,12 +4,21 @@ from .run_length import \
         expected_run_length, \
         evaluate_skeletons, \
         get_skeleton_lengths
-from .split_merge import split_graph
+
+try:
+    import graph_tool  # noqa
+    _have_graph_tool = True
+except ImportError:
+    _have_graph_tool = False
+if _have_graph_tool:
+    from .split_merge import split_graph
 
 __all__ = [
     rand_voi,
     expected_run_length,
     evaluate_skeletons,
-    get_skeleton_lengths,
-    split_graph
+    get_skeleton_lengths
 ]
+
+if _have_graph_tool:
+    __all__.append(split_graph)

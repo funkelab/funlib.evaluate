@@ -259,6 +259,52 @@ class TestRandVoi(unittest.TestCase):
 
         self.assertAlmostEqual(erl, 0)
 
+        # skeleton: o--o--o--o--o (distance = 1 between nodes)
+        #
+        # labels A: 1  1  1  2  2 -> ERL = 1.25
+        # labels B: 1  1  1  1  2 -> ERL = 2.25
+
+        skeletons = networkx.Graph()
+        skeletons.add_node(1, skeleton_id=1, z=0, y=0, x=0)
+        skeletons.add_node(2, skeleton_id=1, z=0, y=0, x=1)
+        skeletons.add_node(3, skeleton_id=1, z=0, y=0, x=2)
+        skeletons.add_node(4, skeleton_id=1, z=0, y=0, x=3)
+        skeletons.add_node(5, skeleton_id=1, z=0, y=0, x=4)
+        skeletons.add_edge(1, 2)
+        skeletons.add_edge(2, 3)
+        skeletons.add_edge(3, 4)
+        skeletons.add_edge(4, 5)
+        node_segment_lut_A = {
+            1: 1,
+            2: 1,
+            3: 1,
+            4: 2,
+            5: 2
+        }
+        node_segment_lut_B = {
+            1: 1,
+            2: 1,
+            3: 1,
+            4: 1,
+            5: 2
+        }
+
+        erl_A = evaluate.expected_run_length(
+            skeletons,
+            'skeleton_id',
+            'length',
+            node_segment_lut_A,
+            skeleton_position_attributes=['z', 'y', 'x'])
+        erl_B = evaluate.expected_run_length(
+            skeletons,
+            'skeleton_id',
+            'length',
+            node_segment_lut_B,
+            skeleton_position_attributes=['z', 'y', 'x'])
+
+        self.assertAlmostEqual(erl_A, 1.25, places=5)
+        self.assertAlmostEqual(erl_B, 2.25, places=5)
+
     def test_expected_run_length_precomputed_lengths(self):
 
         skeletons = networkx.Graph()

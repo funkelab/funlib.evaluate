@@ -1,4 +1,4 @@
 cython
 networkx
 numpy
-scipy
+scipy>=1.4

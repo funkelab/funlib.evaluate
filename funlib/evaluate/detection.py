@@ -74,19 +74,11 @@ def detection_scores(
         'avg_iou': 0.0
     }
 
-    print(f"test: {test}")
-    print(f"truth: {truth}")
-
     for label_id in label_ids:
-        print(f"Processing label {label_id}...")
 
         # get connected components of this label
         test_components, n_test = scipy.ndimage.label(test == label_id)
         true_components, n_true = scipy.ndimage.label(truth == label_id)
-
-        print(f"n_test: {n_test}, n_true: {n_true}")
-        print(f"test_components: {test_components}")
-        print(f"true_components: {true_components}")
 
         # get sizes
         test_ids, test_counts = np.unique(
@@ -97,9 +89,6 @@ def detection_scores(
             true_components[true_components > 0].ravel(),
             return_counts=True)
         true_sizes = {i: c for i, c in zip(true_ids, true_counts)}
-
-        print(f"test_ids: {test_ids}")
-        print(f"true_ids: {true_ids}")
 
         # get centers
         test_centers = np.array(scipy.ndimage.measurements.center_of_mass(
@@ -142,8 +131,6 @@ def detection_scores(
         ]
 
         # get distances (for all pairs of components, in matrix form)
-        print(f"test_centers: {test_centers}")
-        print(f"true_centers: {true_centers}")
         distances = np.ones(
             (n_test + 1, n_true + 1),
             dtype=np.float32)
@@ -156,7 +143,6 @@ def detection_scores(
                 axis=0))
             distances *= center_dists.max()*10
             distances[1:, 1:] = center_dists
-        print(f"distances: {distances}")
 
         # select matching score
         if matching_score == 'overlap':
@@ -171,12 +157,9 @@ def detection_scores(
         else:
             raise RuntimeError(f"Unknown matching score {matching_score}")
 
-        print(f"matching scores: {scores}")
-
         matches = scipy.optimize.linear_sum_assignment(
             scores,
             maximize=maximize)
-        print(f"match indices: {matches}")
 
         rel = {
             'overlap': np.greater_equal,
@@ -192,8 +175,6 @@ def detection_scores(
             and test_id > 0
             and true_id > 0
         ]
-
-        print(f"filtered matches: {matches}")
 
         tp = len(matches)
         fp = n_test - tp

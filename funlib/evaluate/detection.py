@@ -155,9 +155,7 @@ def detection_scores(
                 ])**2,
                 axis=0))
             distances *= center_dists.max()*10
-        else:
-            center_dists = np.array([])
-        distances[1:, 1:] = center_dists
+            distances[1:, 1:] = center_dists
         print(f"distances: {distances}")
 
         # select matching score

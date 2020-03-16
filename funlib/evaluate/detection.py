@@ -206,7 +206,11 @@ def detection_scores(
         detection_scores['avg_distance'] += avg_distance
         detection_scores['avg_iou'] += avg_iou
 
-    detection_scores['avg_distance'] /= detection_scores['tp']
-    detection_scores['avg_iou'] /= detection_scores['tp']
+    if detection_scores['tp'] > 0:
+        detection_scores['avg_distance'] /= detection_scores['tp']
+        detection_scores['avg_iou'] /= detection_scores['tp']
+    else:
+        detection_scores['avg_distance'] = np.nan
+        detection_scores['avg_iou'] /= np.nan
 
     return detection_scores

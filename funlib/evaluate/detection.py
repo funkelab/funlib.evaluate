@@ -9,7 +9,8 @@ def detection_scores(
         label_ids,
         matching_score='overlap',
         matching_threshold=0,
-        voxel_size=None):
+        voxel_size=None,
+        return_matches=False):
     '''Compute common detection scores for connected components between two
     arrays. Scores are computed for each label in `label_ids` separately and
     for all labels together.
@@ -49,6 +50,12 @@ def detection_scores(
             Affects matching if `distance` is chosen as matching score and
             reported values for average distance between matched components.
 
+        return_matches (bool, optional):
+
+            If set, the returned dictionary will also contain arrays with
+            connected components for each label in `truth` and `test`, together
+            with a list of matched components between the two.
+
     Returns:
 
         Dictionary with the keys:
@@ -63,6 +70,15 @@ def detection_scores(
 
         Each of the scores will also be computed per label in `label_ids`,
         resulting in keys `tp_<label_id>`, `fp_<label_id>`, etc.
+
+        If `return_matches` is set, the dictionary will also contain:
+
+            `components_truth_<label_id>`: array of connected components with
+                                           label `<label_id>` in `truth`
+            `components_test_<label_id>`: array of connected components with
+                                          label `<label_id>` in `truth`
+            `matches_<label_id>`: a list of tuples matching components from
+                                  `test` to `truth`
     '''
 
     dims = len(truth.shape)
@@ -205,6 +221,12 @@ def detection_scores(
 
         detection_scores['avg_distance'] += avg_distance
         detection_scores['avg_iou'] += avg_iou
+
+        if return_matches:
+
+            detection_scores[f'matches_{label_id}'] = matches
+            detection_scores[f'components_truth_{label_id}'] = true_components
+            detection_scores[f'components_test_{label_id}'] = test_components
 
     if detection_scores['tp'] > 0:
         detection_scores['avg_distance'] /= detection_scores['tp']

@@ -158,8 +158,8 @@ def evaluate_components(
         return_counts=True)
     test_sizes = {i: c for i, c in zip(test_ids, test_counts)}
     true_sizes = {i: c for i, c in zip(true_ids, true_counts)}
-    n_test = len(test_ids)
-    n_true = len(true_ids)
+    n_test = test_components.max()
+    n_true = true_components.max()
 
     # get centers
     test_centers = np.array(scipy.ndimage.measurements.center_of_mass(
@@ -266,6 +266,7 @@ def evaluate_components(
 
     suffix = f'_{label_id}' if label_id else ''
 
+    detection_scores = {}
     detection_scores['tp' + suffix] = tp
     detection_scores['fp' + suffix] = fp
     detection_scores['fn' + suffix] = fn

@@ -1,7 +1,6 @@
 import numpy as np
 import scipy.ndimage
 import scipy.optimize
-import time
 from .centers import find_centers_cpp
 
 
@@ -99,8 +98,6 @@ def detection_scores(
         true_components, n_true = scipy.ndimage.label(truth == label_id)
 
         # get sizes
-        print("Getting sizes...")
-        start = time.time()
         test_ids, test_counts = np.unique(
             test_components[test_components > 0].ravel(),
             return_counts=True)
@@ -109,29 +106,20 @@ def detection_scores(
             true_components[true_components > 0].ravel(),
             return_counts=True)
         true_sizes = {i: c for i, c in zip(true_ids, true_counts)}
-        print("...%.2fs" % (time.time() - start))
 
         # get centers
-        print("Getting centers...")
-        start = time.time()
         test_centers = find_centers(test_components, test_ids)
         true_centers = find_centers(true_components, true_ids)
-        print(test_centers)
         if voxel_size is not None:
             if n_test > 0:
                 test_centers *= voxel_size
             if n_true > 0:
                 true_centers *= voxel_size
-        print("...%.2fs" % (time.time() - start))
 
         # get pairs and count of shared elements (excluding background 0)
-        print("Getting pairs...")
-        start = time.time()
         both_fg_mask = np.logical_and(test_components > 0, true_components > 0)
         both_fg_test = test_components[both_fg_mask].ravel()
         both_fg_true = true_components[both_fg_mask].ravel()
-        print(both_fg_test.shape)
-        print(both_fg_true.shape)
         if both_fg_true.size > 0:
             pairs, counts = np.unique(
                 np.array([both_fg_test, both_fg_true]),
@@ -140,11 +128,8 @@ def detection_scores(
         else:
             pairs = np.array([[], []], dtype=test_components.dtype)
             counts = np.array([], dtype=np.int32)
-        print("...%.2fs" % (time.time() - start))
 
         # get IoUs (for overlapping components, in matrix form)
-        print("Getting IoUs...")
-        start = time.time()
         ious = np.zeros(
             (n_test + 1, n_true + 1),
             dtype=np.float32)
@@ -152,11 +137,8 @@ def detection_scores(
             c/(test_sizes[test_id] + true_sizes[true_id] - c)
             for test_id, true_id, c in zip(pairs[0], pairs[1], counts)
         ]
-        print("...%.2fs" % (time.time() - start))
 
         # get distances (for all pairs of components, in matrix form)
-        print("Getting pairwise distances...")
-        start = time.time()
         distances = np.ones(
             (n_test + 1, n_true + 1),
             dtype=np.float32)
@@ -169,7 +151,6 @@ def detection_scores(
                 axis=0))
             distances *= center_dists.max()*10
             distances[1:, 1:] = center_dists
-        print("...%.2fs" % (time.time() - start))
 
         # select matching score
         if matching_score == 'overlap':
@@ -192,12 +173,9 @@ def detection_scores(
         else:
             raise RuntimeError(f"Unknown matching score {matching_score}")
 
-        print("Finding matches...")
-        start = time.time()
         matches = scipy.optimize.linear_sum_assignment(
             scores,
             maximize=maximize)
-        print("...%.2fs" % (time.time() - start))
 
         rel = {
             'overlap': np.greater_equal,
@@ -271,9 +249,7 @@ def find_centers(components, ids):
 
     if len(components.shape) == 3:
 
-        start = time.time()
         centers = find_centers_cpp(components.astype(np.uint64))
-        print("C++ find_centers: %.2fs" % (time.time() - start))
         return np.array([
             [centers[i]['z'], centers[i]['y'], centers[i]['x']]
             for i in ids

@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.ndimage
 import scipy.optimize
+from .centers import find_centers_cpp
 
 
 def detection_scores(
@@ -162,35 +163,27 @@ def evaluate_components(
     n_true = int(true_components.max())
 
     # get centers
-    test_centers = np.array(scipy.ndimage.measurements.center_of_mass(
-        np.ones_like(test_components),
-        test_components,
-        test_ids))
-    true_centers = np.array(scipy.ndimage.measurements.center_of_mass(
-        np.ones_like(true_components),
-        true_components,
-        true_ids))
+    test_centers = find_centers(test_components, test_ids)
+    true_centers = find_centers(true_components, true_ids)
+    print(test_centers)
     if voxel_size is not None:
         if n_test > 0:
             test_centers *= voxel_size
         if n_true > 0:
             true_centers *= voxel_size
 
-    # get pairs and count of shared elements
-    pairs, counts = np.unique(
-        [test_components.ravel(), true_components.ravel()],
-        axis=1,
-        return_counts=True)
-    # filter out pairs involving background
-    fg_pairs = np.logical_and(pairs[0] > 0, pairs[1] > 0)
-    pairs = pairs[:, fg_pairs]
-    counts = counts[fg_pairs]
-
-    # get overlaps (in matrix form)
-    overlaps = np.zeros(
-        (n_test + 1, n_true + 1),
-        dtype=np.int64)
-    overlaps[pairs[0], pairs[1]] = counts
+    # get pairs and count of shared elements (excluding background 0)
+    both_fg_mask = np.logical_and(test_components > 0, true_components > 0)
+    both_fg_test = test_components[both_fg_mask].ravel()
+    both_fg_true = true_components[both_fg_mask].ravel()
+    if both_fg_true.size > 0:
+        pairs, counts = np.unique(
+            np.array([both_fg_test, both_fg_true]),
+            axis=1,
+            return_counts=True)
+    else:
+        pairs = np.array([[], []], dtype=test_components.dtype)
+        counts = np.array([], dtype=np.int32)
 
     # get IoUs (for overlapping components, in matrix form)
     ious = np.zeros(
@@ -217,6 +210,11 @@ def evaluate_components(
 
     # select matching score
     if matching_score == 'overlap':
+        # get overlaps (in matrix form)
+        overlaps = np.zeros(
+            (n_test + 1, n_true + 1),
+            dtype=np.int64)
+        overlaps[pairs[0], pairs[1]] = counts
         scores = overlaps
         maximize = True
     elif matching_score == 'iou':
@@ -280,3 +278,25 @@ def evaluate_components(
         detection_scores['components_test' + suffix] = test_components
 
     return detection_scores
+
+
+def find_centers_scipy(components, ids):
+    return np.array(scipy.ndimage.measurements.center_of_mass(
+            np.ones_like(components),
+            components,
+            ids))
+
+
+def find_centers(components, ids):
+
+    if len(components.shape) == 3:
+
+        centers = find_centers_cpp(components.astype(np.uint64))
+        return np.array([
+            [centers[i]['z'], centers[i]['y'], centers[i]['x']]
+            for i in ids
+        ])
+
+    else:
+
+        return find_centers_scipy(components, ids)

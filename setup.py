@@ -23,6 +23,14 @@ setup(
                 ],
                 extra_compile_args=['-O3', '-std=c++11'],
                 include_dirs=[np.get_include()],
+                language='c++'),
+            Extension(
+                'funlib.evaluate.centers',
+                sources=[
+                    'funlib/evaluate/centers.pyx'
+                ],
+                extra_compile_args=['-O3', '-std=c++11'],
+                include_dirs=[np.get_include()],
                 language='c++')
         ])
 )

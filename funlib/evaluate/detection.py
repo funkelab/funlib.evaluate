@@ -165,7 +165,6 @@ def evaluate_components(
     # get centers
     test_centers = find_centers(test_components, test_ids)
     true_centers = find_centers(true_components, true_ids)
-    print(test_centers)
     if voxel_size is not None:
         if n_test > 0:
             test_centers *= voxel_size

@@ -48,6 +48,9 @@ cdef extern from "impl/rand_voi.hpp":
         double rand_merge
         double voi_split
         double voi_merge
+        double nvi_split
+        double nvi_merge
+        double nid
         cpp_map[uint64_t, double] voi_split_i
         cpp_map[uint64_t, double] voi_merge_j
 

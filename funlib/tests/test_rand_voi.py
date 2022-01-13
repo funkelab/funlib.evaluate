@@ -16,6 +16,9 @@ class TestRandVoi(unittest.TestCase):
         assert m['rand_merge'] == 1.0
         assert m['voi_split'] == 0.0
         assert m['voi_merge'] == 0.0
+        assert m['nvi_split'] == 0.0
+        assert m['nvi_merge'] == 0.0
+        assert m['nid'] == 0.0
 
         a = np.array([1, 1, 2, 2], dtype=np.uint64)
         b = np.array([2, 2, 2, 2], dtype=np.uint64)
@@ -26,6 +29,9 @@ class TestRandVoi(unittest.TestCase):
         assert m['rand_merge'] == 0.5
         assert m['voi_split'] == 0.0
         assert m['voi_merge'] == 1.0
+        assert m['nvi_split'] == 0.0
+        assert m['nvi_merge'] == 1.0
+        assert m['nid'] == 1.0
 
         m = evaluate.rand_voi(b, a)
 
@@ -33,6 +39,9 @@ class TestRandVoi(unittest.TestCase):
         assert m['rand_merge'] == 1.0
         assert m['voi_split'] == 1.0
         assert m['voi_merge'] == 0.0
+        assert m['nvi_split'] == 1.0
+        assert m['nvi_merge'] == 0.0
+        assert m['nid'] == 1.0
 
         a = np.array([1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4], dtype=np.uint64)
         b = np.array([3, 3, 3, 3, 4, 5, 6, 6, 5, 5, 5], dtype=np.uint64)
@@ -43,6 +52,9 @@ class TestRandVoi(unittest.TestCase):
         self.assertAlmostEqual(m['rand_merge'], 0.5675675675675675)
         self.assertAlmostEqual(m['voi_split'], 0.6140806820148608)
         self.assertAlmostEqual(m['voi_merge'], 0.7272727272727271)
+        self.assertAlmostEqual(m['nvi_split'], 0.2407837822280942)
+        self.assertAlmostEqual(m['nvi_merge'], 0.2851668894867314)
+        self.assertAlmostEqual(m['nid'], 0.3756069520269456)
 
         m = evaluate.rand_voi(b, a, return_cluster_scores=True)
 
@@ -50,6 +62,9 @@ class TestRandVoi(unittest.TestCase):
         self.assertAlmostEqual(m['rand_merge'], 0.6363636363636364)
         self.assertAlmostEqual(m['voi_split'], 0.7272727272727271)
         self.assertAlmostEqual(m['voi_merge'], 0.6140806820148608)
+        self.assertAlmostEqual(m['nvi_split'], 0.2851668894867314)
+        self.assertAlmostEqual(m['nvi_merge'], 0.2407837822280942)
+        self.assertAlmostEqual(m['nid'], 0.3756069520269456)
 
         self.assertAlmostEqual(sum(m['voi_split_i'].values()), m['voi_split'])
         self.assertAlmostEqual(sum(m['voi_merge_j'].values()), m['voi_merge'])

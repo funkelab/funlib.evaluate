@@ -3,6 +3,7 @@
 
 #include <map>
 #include <math.h>
+#include <cmath>
 
 struct Metrics {
 
@@ -10,6 +11,9 @@ struct Metrics {
 	double voi_merge;
 	double rand_split;
 	double rand_merge;
+	double nvi_split;
+	double nvi_merge;
+	double nid;
 
 	std::map<uint64_t, double> voi_split_i;
 	std::map<uint64_t, double> voi_merge_j;
@@ -123,12 +127,20 @@ rand_voi_arrays(
 	double voi_split = H_ab - H_a;
 	// H(a|b)
 	double voi_merge = H_ab - H_b;
+	
+	// normalized measures
+	double nvi_split = voi_split/H_ab;
+	double nvi_merge = voi_merge/H_ab;
+	double nid = 1 - ((H_a + H_b - H_ab)/fmax(H_a,H_b));
 
 	Metrics metrics;
 	metrics.rand_split = rand_split;
 	metrics.rand_merge = rand_merge;
 	metrics.voi_split  = voi_split;
 	metrics.voi_merge  = voi_merge;
+	metrics.nvi_split = nvi_split;
+	metrics.nvi_merge = nvi_merge;
+	metrics.nid = nid;
 	metrics.voi_split_i = voi_split_i;
 	metrics.voi_merge_j = voi_merge_j;
 

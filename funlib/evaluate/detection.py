@@ -159,8 +159,8 @@ def evaluate_components(
         return_counts=True)
     test_sizes = {i: c for i, c in zip(test_ids, test_counts)}
     true_sizes = {i: c for i, c in zip(true_ids, true_counts)}
-    n_test = int(test_components.max())
-    n_true = int(true_components.max())
+    n_test = len(test_ids)
+    n_true = len(true_ids)
 
     # get centers
     test_centers = find_centers(test_components, test_ids)
